@@ -1,0 +1,1 @@
+web: gunicorn onchain_angels.wsgi
