@@ -68,7 +68,7 @@ else:
 if IS_HEROKU_APP:
     ALLOWED_HOSTS = ["*"]
 else:
-    ALLOWED_HOSTS = [".localhost", "127.0.0.1", "[::1]", "0.0.0.0"]
+    ALLOWED_HOSTS = [".localhost", "127.0.0.1", "[::1]", "0.0.0.0", "poodle-just-instantly.ngrok-free.app"]
 
 
 
@@ -104,6 +104,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Middleware needed to validate the alchemy signature
+    "core.middleware.AlchemyRequestHandlerMiddleware",
 ]
 
 ROOT_URLCONF = 'onchain_angels.urls'
@@ -245,12 +247,15 @@ SPECTACULAR_SETTINGS = {
 }
 
 CSRF_TRUSTED_ORIGINS = [
+    "https://poodle-just-instantly.ngrok-free.app",
+    "https://onchain-angels.com",
     "http://*.vercel.app",
     "http://127.0.0.1:3000",
     "http://localhost:3000",
 ]
 
 CORS_ALLOWED_ORIGINS = [
+    "https://onchain-angels.com",
     "http://127.0.0.1:3000",
     "http://localhost:3000",
 ]
