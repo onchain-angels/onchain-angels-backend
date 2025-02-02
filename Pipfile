@@ -1,0 +1,22 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+django = "*"
+djangorestframework = "*"
+django-extensions = "*"
+drf-spectacular = "*"
+gunicorn = "*"
+dj-database-url = "*"
+whitenoise = "*"
+psycopg = "*"
+python-decouple = "*"
+django-cors-headers = "*"
+
+[dev-packages]
+black = "*"
+
+[requires]
+python_version = "3.10"
