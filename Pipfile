@@ -14,6 +14,7 @@ whitenoise = "*"
 psycopg = "*"
 python-decouple = "*"
 django-cors-headers = "*"
+requests = "*"
 
 [dev-packages]
 black = "*"
