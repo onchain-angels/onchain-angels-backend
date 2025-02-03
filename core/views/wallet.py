@@ -16,4 +16,4 @@ class WalletViewSet(viewsets.ModelViewSet):
     queryset = Wallet.objects.all()
     serializer_class = WalletSerializer
     permission_classes = [permissions.IsAuthenticated]
-    #http_method_names = ["post", "put", "patch", "delete", "head", "options"]
+    # http_method_names = ["post", "put", "patch", "delete", "head", "options"]

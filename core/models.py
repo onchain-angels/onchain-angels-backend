@@ -13,12 +13,13 @@ class Wallet(models.Model):
     def __str__(self):
         return self.address
 
+
 # https://docs.alchemy.com/reference/webhook-addresses
 def _get_webhook_addresses():
-    url = "https://dashboard.alchemy.com/api/webhook-addresses?webhook_id={}&limit=100".format(config("ALCHEMY_WEBHOOK_ID"))
-    headers = {
-        "X-Alchemy-Token": config("ALCHEMY_WEBHOOK_AUTH_TOKEN")
-    }
+    url = "https://dashboard.alchemy.com/api/webhook-addresses?webhook_id={}&limit=100".format(
+        config("ALCHEMY_WEBHOOK_ID")
+    )
+    headers = {"X-Alchemy-Token": config("ALCHEMY_WEBHOOK_AUTH_TOKEN")}
     response = requests.get(url, headers=headers)
     print(response.text)
 
@@ -29,12 +30,12 @@ def _update_webhook_addresses(addresses_to_add, addresses_to_remove):
     payload = {
         "addresses_to_add": addresses_to_add,
         "addresses_to_remove": addresses_to_remove,
-        "webhook_id": config("ALCHEMY_WEBHOOK_ID")
+        "webhook_id": config("ALCHEMY_WEBHOOK_ID"),
     }
     headers = {
         "accept": "application/json",
         "content-type": "application/json",
-        "X-Alchemy-Token": config("ALCHEMY_WEBHOOK_AUTH_TOKEN")
+        "X-Alchemy-Token": config("ALCHEMY_WEBHOOK_AUTH_TOKEN"),
     }
     response = requests.patch(url, json=payload, headers=headers)
     print(response.text)
