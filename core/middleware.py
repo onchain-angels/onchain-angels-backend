@@ -1,11 +1,10 @@
-
 import hmac
 import hashlib
 from django.core.exceptions import PermissionDenied
-from onchain_angels.settings import ALCHEMY_SIGNING_KEY
 import json
 from types import SimpleNamespace
-
+from django.urls import resolve
+from decouple import config
 
 def is_valid_signature_for_string_body(
     body: str, signature: str, signing_key: str
@@ -33,12 +32,15 @@ class AlchemyRequestHandlerMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        str_body = str(request.body, request.encoding or "utf-8")
-        signature = request.headers["x-alchemy-signature"]
-        if not is_valid_signature_for_string_body(str_body, signature, ALCHEMY_SIGNING_KEY):
-            raise PermissionDenied("Signature validation failed, unauthorized!")
+        resolved = resolve(request.path_info)
+        if 'webhook' in resolved.url_name:
+            str_body = str(request.body, request.encoding or "utf-8")
+            signature = request.headers["x-alchemy-signature"]
+            if not is_valid_signature_for_string_body(str_body, signature, config("ALCHEMY_WEBHOOK_SIGNING_KEY")):
+                raise PermissionDenied("Signature validation failed, unauthorized!")
 
-        webhook_event = json.loads(str_body)
-        request.alchemy_webhook_event = AlchemyWebhookEvent(**webhook_event)
+            webhook_event = json.loads(str_body)
+            request.alchemy_webhook_event = AlchemyWebhookEvent(**webhook_event)
+        
         response = self.get_response(request)
         return response

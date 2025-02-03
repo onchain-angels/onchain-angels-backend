@@ -266,4 +266,3 @@ MEDIA_URL = "media/"
 
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
-ALCHEMY_SIGNING_KEY = config("ALCHEMY_SIGNING_KEY")
