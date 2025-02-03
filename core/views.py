@@ -109,7 +109,7 @@ def webhook(request):
 
     # # DEBUG
     # alchemy_network = "eth-mainnet"
-    # to_address = "0xA1529FF79918eDBf244a3D5d935d045F04408aC1"
+    # to_address = ""
     # # DEBUG
 
     # 4. Get the token balance from Alchemy (TODO: move to alchemy python sdk)
