@@ -112,7 +112,7 @@ def webhook(request):
     # to_address = ""
     # # DEBUG
 
-    # 4. Get the token balance from Alchemy
+    # 4. Get token balances from Alchemy
     url = "https://{network}.g.alchemy.com/v2/{alchemy_api_key}".format(
         network=alchemy_network, alchemy_api_key=config("ALCHEMY_API_KEY")
     )
@@ -138,7 +138,7 @@ def webhook(request):
         print("-------------------------")
         print("token: {}".format(token))
 
-        # 5. Get the token metadata from Alchemy
+        # 5. Get token metadata from Alchemy
         url_token_metadata = "https://{network}.g.alchemy.com/v2/{apiKey}".format(
             network=alchemy_network, apiKey=config("ALCHEMY_API_KEY")
         )
@@ -172,7 +172,7 @@ def webhook(request):
         token_amount = token_balance / (10**token_decimals)
         print("token_amount: {}".format(token_amount))
 
-        # 6. Get the token price from Alchemy
+        # 6. Get token price from Alchemy
         url_token_price = (
             "https://api.g.alchemy.com/prices/v1/{apiKey}/tokens/by-address".format(
                 apiKey=config("ALCHEMY_API_KEY")
@@ -207,7 +207,7 @@ def webhook(request):
         print("token_amount_usd: {}".format(token_amount_usd))
 
         if count > 10:
-            return HttpResponse("ENDOFPROCESSING", status=200)
+            return HttpResponse("TOKEN_PROCESSING_LIMIT_REACHED", status=200)
 
     # Be sure to respond with 200 when you successfully process the event
-    return HttpResponse("Done!", status=200)
+    return HttpResponse("DONE", status=200)
