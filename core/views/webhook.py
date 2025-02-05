@@ -1,8 +1,7 @@
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from django.core.exceptions import PermissionDenied
-import requests
-from decouple import config
+import json
 from django.db.models import Q
 
 from core.models import Token, Wallet, WalletToken
@@ -16,13 +15,45 @@ from core.services import (
 )
 
 
+def calculate_portfolio_distribution(wallet_tokens):
+    """
+    Calculates the percentage distribution by category
+    """
+    total_value_usd = sum(token['balance_usd'] for token in wallet_tokens)
+    if total_value_usd == 0:
+        return {}
+    
+    distribution = {}
+    for token in wallet_tokens:
+        category = token.get('token__category', 'unknown')
+        if category not in distribution:
+            distribution[category.lower()] = 0
+        distribution[category.lower()] += (token['balance_usd'] / total_value_usd) * 100
+    
+    return {k: round(v, 2) for k, v in distribution.items()}
+
+def _create_token_movement(token_data, amount, usd_value, movement_type):
+    """
+    Helper function to create a standardized token movement entry
+    """
+    return {
+        'symbol': token_data['token__symbol'],
+        'name': token_data['token__name'],
+        'category': token_data['token__category'].lower(),
+        'coingecko_id': token_data['token__coingecko_id'],
+        'chain_id': token_data['token__chain_id'],
+        'coingecko_chain_id': token_data['token__coingecko_chain_id'],
+        'description': token_data['token__description'],
+        'logo_url': token_data['token__logo_url'],
+        'amount': amount,
+        'usd_value': usd_value,
+        'type': movement_type
+    }
+
 @csrf_exempt
 def webhook(request):
-    # 0. Webhook event from Alchemy
     print("Processing webhook event id: {}".format(request.alchemy_webhook_event.id))
-
     event = request.alchemy_webhook_event.event
-    print("event: {}".format(event))
 
     network = event.get("network")
     print("network: {}".format(network))
@@ -57,7 +88,7 @@ def webhook(request):
     if len(contracts) == 0:
         return HttpResponse("Ignored", status=200)
 
-    # Captura o estado anterior da carteira
+    # Capture previous wallet state
     try:
         normalized_from = from_address.lower()
         normalized_to = to_address.lower()
@@ -71,70 +102,123 @@ def webhook(request):
         ).select_related('token').values(
             'token__address',
             'token__symbol',
+            'token__category',
+            'token__name',
+            'token__coingecko_id',
+            'token__chain_id',
+            'token__coingecko_chain_id',
+            'token__description',
+            'token__logo_url',
             'balance',
             'balance_usd'
         ))
-        print("Estado anterior da carteira:", previous_wallet_tokens)
+        
+        # Calculate previous distribution
+        previous_distribution = calculate_portfolio_distribution(previous_wallet_tokens)
+        print("Previous category distribution:", previous_distribution)
+
     except Wallet.DoesNotExist:
         print("Wallet not found for addresses {} and {}".format(from_address, to_address))
         return HttpResponse("Wallet not found", status=200)
 
-    # Sincroniza a carteira para obter o novo estado
+    # Sync wallet to get new state
     wallet.sync_wallet()
 
-    # Obtém o novo estado da carteira
+    # Get current wallet state
     current_wallet_tokens = list(WalletToken.objects.filter(
         wallet=wallet,
         balance__gt=0
     ).select_related('token').values(
         'token__address',
         'token__symbol',
+        'token__category',
+        'token__name',
+        'token__coingecko_id',
+        'token__chain_id',
+        'token__coingecko_chain_id',
+        'token__description',
+        'token__logo_url',
         'balance',
         'balance_usd'
     ))
 
-    # Analisa as mudanças
+    # Calculate new distribution
+    current_distribution = calculate_portfolio_distribution(current_wallet_tokens)
+    print("Current category distribution:", current_distribution)
+
+    # Compare with target portfolio
+    target_portfolio = wallet.portfolio
+    portfolio_comparison = {}
+    
+    for category in set(list(current_distribution.keys()) + list(target_portfolio.keys())):
+        current_value = current_distribution.get(category, 0)
+        target_value = target_portfolio.get(category, 0)
+        if abs(current_value - target_value) > 0.01:  # Difference greater than 0.01%
+            portfolio_comparison[category.lower()] = {
+                'current': current_value,
+                'target': target_value,
+                'deviation': round(current_value - target_value, 2)
+            }
+    
+    print("Portfolio target deviation:", portfolio_comparison)
+    
+    # Calculate distribution changes
+    category_changes = {}
+    all_categories = set(list(previous_distribution.keys()) + list(current_distribution.keys()))
+    
+    for category in all_categories:
+        prev_value = previous_distribution.get(category, 0)
+        curr_value = current_distribution.get(category, 0)
+        if abs(prev_value - curr_value) > 0.01:  # Change greater than 0.01%
+            category_changes[category.lower()] = {
+                'before': prev_value,
+                'after': curr_value,
+                'change': round(curr_value - prev_value, 2)
+            }
+    
+    print("Category distribution changes:", category_changes)
+
+    # Analyze changes
     previous_tokens = {t['token__address']: t for t in previous_wallet_tokens}
     current_tokens = {t['token__address']: t for t in current_wallet_tokens}
 
-    # Identifica tokens comprados (novos ou aumentou balance)
+    # Identify bought tokens (new or increased balance)
     tokens_bought = []
     for addr, current in current_tokens.items():
         if addr not in previous_tokens:
-            tokens_bought.append({
-                'symbol': current['token__symbol'],
-                'amount': current['balance'],
-                'usd_value': current['balance_usd'],
-                'type': 'new_position'
-            })
+            tokens_bought.append(_create_token_movement(
+                current,
+                current['balance'],
+                current['balance_usd'],
+                'new_position'
+            ))
         elif current['balance'] > previous_tokens[addr]['balance']:
-            tokens_bought.append({
-                'symbol': current['token__symbol'],
-                'amount': current['balance'] - previous_tokens[addr]['balance'],
-                'usd_value': current['balance_usd'] - previous_tokens[addr]['balance_usd'],
-                'type': 'increased_position'
-            })
+            tokens_bought.append(_create_token_movement(
+                current,
+                current['balance'] - previous_tokens[addr]['balance'],
+                current['balance_usd'] - previous_tokens[addr]['balance_usd'],
+                'increased_position'
+            ))
 
-    # Identifica tokens vendidos (removidos ou diminuiu balance)
+    # Identify sold tokens (removed or decreased balance)
     tokens_sold = []
     for addr, previous in previous_tokens.items():
         if addr not in current_tokens:
-            tokens_sold.append({
-                'symbol': previous['token__symbol'],
-                'amount': previous['balance'],
-                'usd_value': previous['balance_usd'],
-                'type': 'closed_position'
-            })
+            tokens_sold.append(_create_token_movement(
+                previous,
+                previous['balance'],
+                previous['balance_usd'],
+                'closed_position'
+            ))
         elif current_tokens[addr]['balance'] < previous['balance']:
-            tokens_sold.append({
-                'symbol': previous['token__symbol'],
-                'amount': previous['balance'] - current_tokens[addr]['balance'],
-                'usd_value': previous['balance_usd'] - current_tokens[addr]['balance_usd'],
-                'type': 'decreased_position'
-            })
+            tokens_sold.append(_create_token_movement(
+                previous,
+                previous['balance'] - current_tokens[addr]['balance'],
+                previous['balance_usd'] - current_tokens[addr]['balance_usd'],
+                'decreased_position'
+            ))
 
-    print("Tokens comprados:", tokens_bought)
-    print("Tokens vendidos:", tokens_sold)
+    print("Tokens bought:", json.dumps(tokens_bought, indent=2))
+    print("Tokens sold:", json.dumps(tokens_sold, indent=2))
 
-    # Be sure to respond with 200 when you successfully process the event
     return HttpResponse("DONE", status=200)
