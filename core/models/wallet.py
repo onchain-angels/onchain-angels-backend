@@ -202,12 +202,13 @@ def _update_webhook_addresses(addresses_to_add, addresses_to_remove):
 
 
 @receiver(post_save, sender=Wallet)
-def post_save_signal(sender, instance, **kwargs):
-    print("updating webhook addresses")
-    _update_webhook_addresses([instance.address], [])
-    print("getting webhook addresses")
-    _get_webhook_addresses()
-    instance.sync_wallet()
+def post_save_signal(sender, instance, created, **kwargs):
+    if created:
+        print("updating webhook addresses")
+        _update_webhook_addresses([instance.address], [])
+        print("getting webhook addresses")
+        _get_webhook_addresses()
+        instance.sync_wallet()
 
 
 @receiver(post_delete, sender=Wallet)

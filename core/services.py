@@ -10,7 +10,6 @@ You are a crypto analyst. You will be given a token description and set of categ
 You will need to categorize this token according to a new set of categories: {', '.join([choice[0] for choice in Token.CATEGORY_CHOICES])}.
 Be extremely concise and do not include explanations, reasoning, or any additional commentary.
 You should respond with only the category name exactly as it is in the list."""
-    print("system_prompt: {}".format(system_prompt))
     response = client.chat.completions.create(
         max_tokens=1024,
         model=config("OPENAI_MODEL"),
