@@ -15,6 +15,7 @@ psycopg = "*"
 python-decouple = "*"
 django-cors-headers = "*"
 requests = "*"
+openai = "*"
 
 [dev-packages]
 black = "*"

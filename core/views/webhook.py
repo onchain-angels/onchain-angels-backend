@@ -1,9 +1,18 @@
 from django.views.decorators.csrf import csrf_exempt
-
 from django.http import HttpResponse
 from django.core.exceptions import PermissionDenied
 import requests
 from decouple import config
+
+from core.models import Token, Wallet, WalletToken
+from core.services import (
+    check_coingecko_by_contract,
+    get_transaction_history_etherscan,
+    get_eth_balance_etherscan,
+    get_token_balance_alchemy,
+    get_token_metadata_alchemy,
+    get_token_price_alchemy,
+)
 
 
 @csrf_exempt
@@ -18,6 +27,7 @@ def webhook(request):
     print("network: {}".format(network))
 
     contracts = []
+    wallet_tokens = []
 
     activities = event.get("activity")
     for activity in activities:
@@ -43,22 +53,29 @@ def webhook(request):
 
     print("contracts: {}".format(contracts))
 
+    try:
+        wallet = Wallet.objects.get(address=to_address)
+        print("Wallet: {}".format(wallet))
+    except Wallet.DoesNotExist:
+        print("Wallet {} not found".format(to_address))
+        return HttpResponse("Wallet not found", status=200)
+
     # alchemy: https://docs.alchemy.com/reference/supported-chains
     # etherscan: https://api.etherscan.io/v2/chainlist
     if network == "BASE_SEPOLIA":
-        cg_network_id = None
+        cg_network = None
         alchemy_network = "base-sepolia"
         etherscan_chain_id = 84532
     elif network == "BASE":
-        cg_network_id = "base"
+        cg_network = "base"
         alchemy_network = "base-mainnet"
         etherscan_chain_id = 8453
     elif network == "ETH_SEPOLIA":
-        cg_network_id = None
+        cg_network = None
         alchemy_network = "eth-sepolia"
         etherscan_chain_id = 11155111
     elif network == "ETH_MAINNET":
-        cg_network_id = "ethereum"
+        cg_network = "ethereum"
         alchemy_network = "eth-mainnet"
         etherscan_chain_id = 1
     else:
@@ -66,46 +83,46 @@ def webhook(request):
         raise Exception("Unsupported network: {}".format(network))
 
     # 1. Get token info from CoinGecko
-    if cg_network_id is not None:
-        url = "{coingecko_endpoint}/coins/{id}/contract/{contract_address}".format(
-            coingecko_endpoint=config("COINMARKETCAP_API_URL"),
-            id=cg_network_id,
-            contract_address=contract_address,
-        )
-        headers = {
-            "accept": "application/json",
-            "x-cg-pro-api-key": config("COINGECKO_API_KEY"),
-        }
-        token_info = requests.get(url, headers=headers)
-
-        print("token_info: {}".format(token_info))
+    if cg_network is not None:
+        cg_token_info = check_coingecko_by_contract(cg_network, contract_address)
 
     # 2. Get a list of Transactions By Address from Basescan
-    url = "{etherscan_endpoint}?chainid={chain_id}&module=account&action={action}&address={address}&startblock=0&endblock=99999999&page={page}&offset={offset}&sort={sort}&apikey={api_key}".format(
-        etherscan_endpoint=config("ETHERSCAN_API_URL"),
-        chain_id=etherscan_chain_id,
-        action="txlist",  # Normal Transactions
-        # action="txlistinternal",  # Internal Transactions
-        # action="tokentx",  # ERC20 Token Transfer Events
-        # action="tokennfttx",  # ERC721 Token Transfer Events
-        address=to_address,
-        page=1,
-        offset=1000,
-        sort="desc",
-        api_key=config("ETHERSCAN_API_KEY"),
+    transaction_history = get_transaction_history_etherscan(
+        etherscan_chain_id, to_address
     )
-    transaction_history = requests.get(url)
-    # print("transaction_history: {}".format(transaction_history.json()))
 
     # 3. ETH balance
-    url = "{etherscan_endpoint}?chainid={chain_id}&module=account&action=balance&address={address}&tag=latest&apikey={api_key}".format(
-        etherscan_endpoint=config("ETHERSCAN_API_URL"),
-        chain_id=etherscan_chain_id,
-        address=to_address,
-        api_key=config("ETHERSCAN_API_KEY"),
-    )
-    eth_balance = requests.get(url)
-    print("eth_balance: {}".format(eth_balance.json()))
+    eth_balance = get_eth_balance_etherscan(etherscan_chain_id, to_address)
+
+    if eth_balance > 0:
+        try:
+            eth_obj, _ = Token.objects.get_or_create(
+                address="0x0000000000000000000000000000000000000001",
+                category="MAJORS",
+                # coingecko_id=xxx,
+                # alchemy_id=token_id,
+                chain_id=etherscan_chain_id,
+                alchemy_chain_id=alchemy_network,
+                coingecko_chain_id=cg_network,
+                decimals=18,
+                symbol="ETH",
+                name="ETH",
+                # description=xxxx, #coingecko
+                # logo_url=xxxx,
+            )
+            WalletToken.objects.update_or_create(
+                wallet=wallet,
+                token=eth_obj,
+                defaults={
+                    "balance": eth_balance,
+                },
+            )
+            wallet_tokens.append(eth_obj.id)
+
+        except Exception as e:
+            print(
+                "Error creating or updating Token or WalletToken object: {}".format(e)
+            )
 
     # # DEBUG
     # alchemy_network = "eth-mainnet"
@@ -113,85 +130,74 @@ def webhook(request):
     # # DEBUG
 
     # 4. Get token balances from Alchemy
-    url = "https://{network}.g.alchemy.com/v2/{alchemy_api_key}".format(
-        network=alchemy_network, alchemy_api_key=config("ALCHEMY_API_KEY")
-    )
-
-    payload = {
-        "id": 1,
-        "jsonrpc": "2.0",
-        "method": "alchemy_getTokenBalances",
-        "params": [to_address],
-    }
-    headers = {"accept": "application/json", "content-type": "application/json"}
-    token_balances_response = requests.post(url, json=payload, headers=headers)
-    print("token_balances_response: {}".format(token_balances_response.json()))
-
-    tokens = token_balances_response.json().get("result").get("tokenBalances")
-
-    print("tokens: {}".format(tokens))
+    tokens = get_token_balance_alchemy(alchemy_network, to_address)
 
     count = 0
-
     for token in tokens:
+
+        token_contract_address = token.get("contractAddress")
+
         count += 1
+
         print("-------------------------")
         print("token: {}".format(token))
 
         # 5. Get token metadata from Alchemy
-        url_token_metadata = "https://{network}.g.alchemy.com/v2/{apiKey}".format(
-            network=alchemy_network, apiKey=config("ALCHEMY_API_KEY")
+        token_metadata = get_token_metadata_alchemy(
+            alchemy_network, token_contract_address
         )
-        payload = {
-            "id": 1,
-            "jsonrpc": "2.0",
-            "method": "alchemy_getTokenMetadata",
-            "params": [token.get("contractAddress")],
-        }
-        headers = {"accept": "application/json", "content-type": "application/json"}
-        response_token_metadata = requests.post(
-            url_token_metadata, json=payload, headers=headers
-        )
-        print("response_token_metadata: {}".format(response_token_metadata.json()))
+        token_decimals = int(token_metadata.get("result").get("decimals"))
+        token_symbol = token_metadata.get("result").get("symbol")
+        token_logo = token_metadata.get("result").get("logo")
 
-        token_decimals = int(
-            response_token_metadata.json().get("result").get("decimals")
-        )
-        print("token_decimals: {}".format(token_decimals))
-
-        token_balance_hex = token.get(
-            "tokenBalance"
-        )  # 0x000000000000000000000000000000000000000000000000000000005907c51d
+        token_balance_hex = token.get("tokenBalance")
         print("token_balance_hex: {}".format(token_balance_hex))
 
         token_balance = int(token_balance_hex, 16)
         print("token_balance: {}".format(token_balance))
 
-        token_contract_address = token.get("contractAddress")
+        if token_balance > 0:
+            try:
+                token_obj, _ = Token.objects.get_or_create(
+                    address=token_contract_address,
+                    # category=xxxx,  #coingecko
+                    # coingecko_id=xxx,
+                    # alchemy_id=xxx,
+                    chain_id=etherscan_chain_id,
+                    alchemy_chain_id=alchemy_network,
+                    coingecko_chain_id=cg_network,
+                    decimals=token_decimals,
+                    symbol=token_symbol,
+                    name=token_symbol,
+                    # description=xxxx, #coingecko
+                    logo_url=token_logo,
+                )
+                WalletToken.objects.update_or_create(
+                    wallet=wallet,
+                    token=token_obj,
+                    defaults={
+                        "balance": token_balance_hex,
+                    },
+                )
+                wallet_tokens.append(token_obj.id)
+
+            except Exception as e:
+                print(
+                    "Error creating or updating Token or WalletToken object: {}".format(
+                        e
+                    )
+                )
 
         token_amount = token_balance / (10**token_decimals)
         print("token_amount: {}".format(token_amount))
 
         # 6. Get token price from Alchemy
-        url_token_price = (
-            "https://api.g.alchemy.com/prices/v1/{apiKey}/tokens/by-address".format(
-                apiKey=config("ALCHEMY_API_KEY")
-            )
+        token_price_json = get_token_price_alchemy(
+            alchemy_network, token_contract_address
         )
-        payload = {
-            "addresses": [
-                {"network": alchemy_network, "address": token_contract_address}
-            ]
-        }
-        headers = {"accept": "application/json", "content-type": "application/json"}
-        response_token_price = requests.post(
-            url_token_price, json=payload, headers=headers
-        )
-        print("response_token_price: {}".format(response_token_price.json()))
 
-        data = response_token_price.json().get("data")
         token_price = 0
-        for item in data:
+        for item in token_price_json.get("data"):
             prices = item.get("prices")
             for price in prices:
                 price_currency = price.get("currency")
@@ -207,7 +213,11 @@ def webhook(request):
         print("token_amount_usd: {}".format(token_amount_usd))
 
         if count > 10:
-            return HttpResponse("TOKEN_PROCESSING_LIMIT_REACHED", status=200)
+            break
+
+    WalletToken.objects.filter(wallet=wallet).exclude(
+        token__id__in=wallet_tokens
+    ).update(balance=0)
 
     # Be sure to respond with 200 when you successfully process the event
     return HttpResponse("DONE", status=200)
