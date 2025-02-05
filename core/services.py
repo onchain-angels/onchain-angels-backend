@@ -43,9 +43,10 @@ def check_coingecko_by_contract(network, contract_address):
         "accept": "application/json",
     }
     token_info = requests.get(url, headers=headers)
-    print("check_coingecko_by_contract status: {}".format(token_info.status_code))
     if(token_info.status_code != 200):
+        print("Error getting token info from CoinGecko: {}".format(token_info.json().get("error")))
         return None
+    print("Query completed successfully!")
     return parse_coingecko_token_info(token_info.json(), network)
 
 
@@ -61,7 +62,10 @@ def check_coingecko_by_coin(symbol):
         "accept": "application/json",
     }
     token_info = requests.get(url, headers=headers)
-    print("check_coingecko_by_coin status: {}".format(token_info.status_code))
+    if(token_info.status_code != 200):
+        print("Error getting token info from CoinGecko: {}".format(token_info.json().get("error")))
+        return None
+    print("Query completed successfully!")
     if(token_info.status_code != 200):
         return None
     return parse_coingecko_token_info(token_info.json())

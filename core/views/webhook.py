@@ -1,19 +1,9 @@
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
-from django.core.exceptions import PermissionDenied
 import json
 from django.db.models import Q
 
 from core.models import Token, Wallet, WalletToken
-from core.services import (
-    check_coingecko_by_contract,
-    get_transaction_history_etherscan,
-    get_eth_balance_etherscan,
-    get_token_balance_alchemy,
-    get_token_metadata_alchemy,
-    get_token_price_alchemy,
-)
-
 
 def calculate_portfolio_distribution(wallet_tokens):
     """
@@ -144,7 +134,7 @@ def webhook(request):
 
     # Calculate new distribution
     current_distribution = calculate_portfolio_distribution(current_wallet_tokens)
-    print("Current category distribution:", current_distribution)
+    # print("Current category distribution:", json.dumps(current_distribution, indent=2))
 
     # Compare with target portfolio
     target_portfolio = wallet.portfolio
@@ -160,7 +150,7 @@ def webhook(request):
                 'deviation': round(current_value - target_value, 2)
             }
     
-    print("Portfolio target deviation:", portfolio_comparison)
+    # print("Portfolio target deviation:", json.dumps(portfolio_comparison, indent=2))
     
     # Calculate distribution changes
     category_changes = {}
@@ -176,7 +166,7 @@ def webhook(request):
                 'change': round(curr_value - prev_value, 2)
             }
     
-    print("Category distribution changes:", category_changes)
+    # print("Category distribution changes:", json.dumps(category_changes, indent=2))
 
     # Analyze changes
     previous_tokens = {t['token__address']: t for t in previous_wallet_tokens}
@@ -218,7 +208,40 @@ def webhook(request):
                 'decreased_position'
             ))
 
-    print("Tokens bought:", json.dumps(tokens_bought, indent=2))
-    print("Tokens sold:", json.dumps(tokens_sold, indent=2))
+    # print("Tokens bought:", json.dumps(tokens_bought, indent=2))
+    # print("Tokens sold:", json.dumps(tokens_sold, indent=2))
 
-    return HttpResponse("DONE", status=200)
+    # Prepare integrated response
+    response_data = {
+        "wallet": wallet.address,
+        "chain_id": wallet.chain_id,
+        "farcaster_handle": wallet.farcaster_handle,
+        "twitter_handle": wallet.twitter_handle,
+        "portfolio": {},
+        "recent_operations": []
+    }
+
+    # Build portfolio data
+    all_categories = set(list(previous_distribution.keys()) + 
+                        list(current_distribution.keys()) + 
+                        list(wallet.portfolio.keys()))
+    
+    for category in all_categories:
+        prev_value = previous_distribution.get(category, 0)
+        curr_value = current_distribution.get(category, 0)
+        target_value = wallet.portfolio.get(category, 0)
+        
+        response_data["portfolio"][category] = {
+            "before": round(prev_value, 2),
+            "current": round(curr_value, 2),
+            "change": round(curr_value - prev_value, 2),
+            "target": target_value,
+            "deviation": round(curr_value - target_value, 2)
+        }
+
+    # Add recent operations (combining bought and sold tokens)
+    response_data["recent_operations"] = tokens_sold + tokens_bought
+
+    print("Summary:", json.dumps(response_data, indent=2))
+
+    return HttpResponse("DONE", content_type="application/json", status=200)
