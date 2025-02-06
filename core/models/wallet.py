@@ -16,21 +16,23 @@ from core.services import (
 from core.models.token import Token, WalletToken
 
 
-def _add_token_to_wallet(wallet, token_contract_address, token_info, token_balance_decimal):
+def _add_token_to_wallet(
+    wallet, token_contract_address, token_info, token_balance_decimal
+):
     token_obj, _ = Token.objects.update_or_create(
         address=token_contract_address,
         chain_id=wallet.chain_id,
         coingecko_chain_id=wallet.coingecko_network,
         defaults={
-            'coingecko_id': token_info.get("token_id"),
-            'decimals': token_info.get("token_decimals"),
-            'symbol': token_info.get("token_symbol"),
-            'name': token_info.get("token_name"),
-            'description': token_info.get("token_description"),
-            'logo_url': token_info.get("logo_url"),
-            'category': token_info.get("token_category"),
-            'market_data': token_info.get("market_data"),
-        }
+            "coingecko_id": token_info.get("token_id"),
+            "decimals": token_info.get("token_decimals"),
+            "symbol": token_info.get("token_symbol"),
+            "name": token_info.get("token_name"),
+            "description": token_info.get("token_description"),
+            "logo_url": token_info.get("logo_url"),
+            "category": token_info.get("token_category"),
+            "market_data": token_info.get("market_data"),
+        },
     )
 
     token_price_usd = token_info.get("token_price_usd")
@@ -50,7 +52,7 @@ def _add_token_to_wallet(wallet, token_contract_address, token_info, token_balan
     )
     return token_obj
 
- 
+
 def sync_wallet(wallet):
     try:
         # 1. Get token balances from Alchemy
@@ -61,7 +63,7 @@ def sync_wallet(wallet):
 
     wallet_tokens = []
 
-    try:  
+    try:
         # 2. Get ETH balance
         eth_balance = get_eth_balance_etherscan(wallet.chain_id, wallet.address)
 
@@ -71,10 +73,15 @@ def sync_wallet(wallet):
                 token_info = check_coingecko_by_coin("ethereum")
 
             except Exception as e:
-               print("Error getting token info from CoinGecko: {}".format(e))
+                print("Error getting token info from CoinGecko: {}".format(e))
 
             try:
-                eth_obj = _add_token_to_wallet(wallet, "0x0000000000000000000000000000000000000001", token_info, eth_balance)
+                eth_obj = _add_token_to_wallet(
+                    wallet,
+                    "0x0000000000000000000000000000000000000001",
+                    token_info,
+                    eth_balance,
+                )
                 wallet_tokens.append(eth_obj.id)
 
             except Exception as e:
@@ -95,14 +102,18 @@ def sync_wallet(wallet):
         if token_balance_decimal > 0:
             try:
                 # 4. Get token info from CoinGecko
-                token_info = check_coingecko_by_contract(wallet.coingecko_network, token_contract_address)
-                
+                token_info = check_coingecko_by_contract(
+                    wallet.coingecko_network, token_contract_address
+                )
+
             except Exception as e:
                 print("Error getting token info from CoinGecko: {}".format(e))
                 continue
 
             try:
-                token_obj = _add_token_to_wallet(wallet, token_contract_address, token_info, token_balance_decimal)
+                token_obj = _add_token_to_wallet(
+                    wallet, token_contract_address, token_info, token_balance_decimal
+                )
                 wallet_tokens.append(token_obj.id)
 
             except Exception as e:

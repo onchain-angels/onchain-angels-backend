@@ -16,6 +16,11 @@ python-decouple = "*"
 django-cors-headers = "*"
 requests = "*"
 openai = "*"
+pyjwt = "*"
+httpx = "*"
+ecdsa = "*"
+cryptography = "*"
+nilql = {editable = true, git = "https://github.com/NillionNetwork/nilql-py.git"}
 
 [dev-packages]
 black = "*"

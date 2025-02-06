@@ -3,6 +3,7 @@ from decouple import config
 from openai import OpenAI
 from core.models.token import Token
 
+
 def extract_token_category(token_description):
     client = OpenAI(api_key=config("OPENAI_API_KEY"))
     system_prompt = f"""
@@ -43,8 +44,12 @@ def check_coingecko_by_contract(network, contract_address):
         "accept": "application/json",
     }
     token_info = requests.get(url, headers=headers)
-    if(token_info.status_code != 200):
-        print("Error getting token info from CoinGecko: {}".format(token_info.json().get("error")))
+    if token_info.status_code != 200:
+        print(
+            "Error getting token info from CoinGecko: {}".format(
+                token_info.json().get("error")
+            )
+        )
         return None
     print("Query completed successfully!")
     return parse_coingecko_token_info(token_info.json(), network)
@@ -55,18 +60,20 @@ def check_coingecko_by_coin(symbol):
         coingecko_endpoint=config("COINGECKO_API_URL"),
         symbol=symbol,
     )
-    print(
-        "Checking CoinGecko for token `{}` ({})...".format(symbol, url)
-    )
+    print("Checking CoinGecko for token `{}` ({})...".format(symbol, url))
     headers = {
         "accept": "application/json",
     }
     token_info = requests.get(url, headers=headers)
-    if(token_info.status_code != 200):
-        print("Error getting token info from CoinGecko: {}".format(token_info.json().get("error")))
+    if token_info.status_code != 200:
+        print(
+            "Error getting token info from CoinGecko: {}".format(
+                token_info.json().get("error")
+            )
+        )
         return None
     print("Query completed successfully!")
-    if(token_info.status_code != 200):
+    if token_info.status_code != 200:
         return None
     return parse_coingecko_token_info(token_info.json())
 
@@ -77,7 +84,9 @@ def parse_coingecko_token_info(token_info, network=None):
     token_symbol = token_info.get("symbol")
     token_description = token_info.get("description", {}).get("en")
     token_categories = token_info.get("categories", [])
-    token_description = token_description + "\n" + "Coingecko categories: " + ";".join(token_categories)
+    token_description = (
+        token_description + "\n" + "Coingecko categories: " + ";".join(token_categories)
+    )
 
     try:
         token_category = extract_token_category(token_description)
@@ -88,10 +97,10 @@ def parse_coingecko_token_info(token_info, network=None):
 
     images = token_info.get("image", {})
     logo_url = images.get("small")
-    
+
     if network:
         platform_details = token_info.get("detail_platforms", {}).get(network, {})
-        token_decimals =int(platform_details.get("decimal_place"))
+        token_decimals = int(platform_details.get("decimal_place"))
     else:
         token_decimals = 18
 
@@ -103,7 +112,9 @@ def parse_coingecko_token_info(token_info, network=None):
         "total_supply": market_data.get("total_supply"),
         "circulating_supply": market_data.get("circulating_supply"),
         "market_cap_rank": market_data.get("market_cap_rank"),
-        "fully_diluted_valuation_usd": market_data.get("fully_diluted_valuation", {}).get("usd"),
+        "fully_diluted_valuation_usd": market_data.get(
+            "fully_diluted_valuation", {}
+        ).get("usd"),
         "market_cap_fdv_ratio": market_data.get("market_cap_fdv_ratio"),
         "total_volume_usd": market_data.get("total_volume", {}).get("usd"),
         "high_24h_usd": market_data.get("high_24h", {}).get("usd"),
@@ -115,7 +126,7 @@ def parse_coingecko_token_info(token_info, network=None):
         "price_change_percentage_30d": market_data.get("price_change_percentage_30d"),
         "price_change_percentage_60d": market_data.get("price_change_percentage_60d"),
         "price_change_percentage_200d": market_data.get("price_change_percentage_200d"),
-        "price_change_percentage_1y": market_data.get("price_change_percentage_1y")
+        "price_change_percentage_1y": market_data.get("price_change_percentage_1y"),
     }
 
     return {

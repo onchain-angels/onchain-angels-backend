@@ -12,7 +12,9 @@ class Token(models.Model):
     ]
 
     address = models.CharField(max_length=255, unique=True)
-    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, blank=True, null=True)
+    category = models.CharField(
+        max_length=20, choices=CATEGORY_CHOICES, blank=True, null=True
+    )
 
     coingecko_id = models.CharField(max_length=50, blank=True, null=True)
     alchemy_id = models.CharField(max_length=50, blank=True, null=True)

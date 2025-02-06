@@ -20,7 +20,14 @@ class WalletSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Wallet
-        fields = ["id", "address", "farcaster_handle", "twitter_handle", "portfolio", "chain_id"]
+        fields = [
+            "id",
+            "address",
+            "farcaster_handle",
+            "twitter_handle",
+            "portfolio",
+            "chain_id",
+        ]
 
     def validate(self, data):
         """
