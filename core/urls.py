@@ -10,6 +10,6 @@ router.register(r"wallets", views.WalletViewSet)
 
 urlpatterns = [
     path("webhook/", views.webhook, name="webhook"),
-    path("test-nillion/", views.test_nillion, name="test-nillion"),
+    # path("test-nillion/", views.test_nillion, name="test-nillion"),
     path("", include(router.urls)),
 ]

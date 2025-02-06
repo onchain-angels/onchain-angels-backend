@@ -518,7 +518,7 @@
         "nillion-sv-wrappers-py": {
             "editable": true,
             "git": "https://github.com/onchain-angels/nillion-sv-wrappers-py.git",
-            "ref": "439a5402d07bdb646fd0a00515255f7a5f38d80f"
+            "ref": "42850696e2c397f9472d80fffbe1b3055b913a03"
         },
         "nilql": {
             "git": "git+https://github.com/NillionNetwork/nilql-py.git#egg=nilql",
