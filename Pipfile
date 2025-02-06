@@ -16,11 +16,7 @@ python-decouple = "*"
 django-cors-headers = "*"
 requests = "*"
 openai = "*"
-pyjwt = "*"
-httpx = "*"
-ecdsa = "*"
-cryptography = "*"
-nilql = {editable = true, git = "https://github.com/NillionNetwork/nilql-py.git"}
+nillion-sv-wrappers-py = {editable = true, ref = "main", git = "https://github.com/onchain-angels/nillion-sv-wrappers-py.git"}
 
 [dev-packages]
 black = "*"

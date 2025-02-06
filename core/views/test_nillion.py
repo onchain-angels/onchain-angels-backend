@@ -2,15 +2,14 @@ import asyncio
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from decouple import config
-from core.services.nillion import SecretVaultWrapper, config as nillion_config
+from nillion_sv_wrappers import SecretVaultWrapper
 
+from core.nillion_config import config as nillion_config
 
 @csrf_exempt
 async def test_nillion(request):
 
-    NILLION_SCHEMA_ID = (
-        "ba23f90a-1df7-4ba2-98dd-b412797c314c"  # config("NILLION_SCHEMA_ID")
-    )
+    NILLION_SCHEMA_ID = config("NILLION_SCHEMA_ID")
 
     # Initialize the SecretVault wrapper with nodes, credentials and schema ID
     vault = SecretVaultWrapper(
@@ -23,11 +22,11 @@ async def test_nillion(request):
     try:
 
         # 1. List existing schemas
-        print("\n1. Existing schemas:")
+        print("Existing schemas:")
         existing_schemas = await vault.get_schemas()
         print(existing_schemas)
 
-        # 2. Define a new schema (the "$share" field will be encrypted)
+        # 2. Define a new schema (the "%share" field will be encrypted)
         test_schema = {
             "$schema": "http://json-schema.org/draft-07/schema#",
             "title": "Web3 Experience Survey",
@@ -38,13 +37,13 @@ async def test_nillion(request):
                     "_id": {"type": "string", "format": "uuid", "coerce": True},
                     "name": {
                         "type": "object",
-                        "properties": {"$share": {"type": "string"}},
-                        "required": ["$share"],
+                        "properties": {"%share": {"type": "string"}},
+                        "required": ["%share"],
                     },
                     "years_in_web3": {
                         "type": "object",
-                        "properties": {"$share": {"type": "string"}},
-                        "required": ["$share"],
+                        "properties": {"%share": {"type": "string"}},
+                        "required": ["%share"],
                     },
                     "responses": {
                         "type": "array",
@@ -68,29 +67,28 @@ async def test_nillion(request):
         }
 
         # 3. Create new schema
-        print("\n2. Creating new schema...")
+        print("Creating new schema...")
         create_result = await vault.create_schema(
             schema=test_schema, schema_name="test_schema"
         )
         print("Creation result:", create_result)
-
         # Get the schema ID from the result
         schema_id = create_result[0]["result"]["data"]
         print(f"Created Schema ID: {schema_id}")
 
-        # 4 Write data to collection (fields marked with "$allot" will be processed according to the wrapper)
+        # 4 Write data to collection (fields marked with "%allot" will be processed according to the wrapper)
         test_data = [
             {
-                "name": {"$allot": "Vitalik Buterin"},
-                "years_in_web3": {"$allot": 8},
+                "name": {"%allot": "Vitalik Buterin"},
+                "years_in_web3": {"%allot": 8},
                 "responses": [
                     {"rating": 5, "question_number": 1},
                     {"rating": 3, "question_number": 2},
                 ],
             },
             {
-                "name": {"$allot": "Satoshi Nakamoto"},
-                "years_in_web3": {"$allot": 14},
+                "name": {"%allot": "Satoshi Nakamoto"},
+                "years_in_web3": {"%allot": 14},
                 "responses": [
                     {"rating": 2, "question_number": 1},
                     {"rating": 5, "question_number": 2},
@@ -104,10 +102,10 @@ async def test_nillion(request):
         read_result = await vault.read_from_nodes({})
         print("Data read (first 5 records):", read_result[:5])
 
-        # # 6. Delete the created schema
-        # print("\n4. Deleting schema...")
-        # delete_result = await vault.delete_schema(schema_id)
-        # print("Deletion result:", delete_result)
+        # 6. Delete the created schema
+        print("Deleting schema...")
+        delete_result = await vault.delete_schema(schema_id)
+        print("Deletion result:", delete_result)
 
         return HttpResponse("Test completed successfully", status=200)
 

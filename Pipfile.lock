@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "93fac556fdc569a42fd2bf22fb6d23ab908e450a93542e80ced4b0426a6719d3"
+            "sha256": "1c7fae264c29232821c2f716145ca93b9d02de6ae6430d7ff71509f267de1a50"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -280,7 +280,6 @@
                 "sha256:f5e7cb1e5e56ca0933b4873c0220a78b773b24d40d186b6738080b73d3d0a756",
                 "sha256:f677e1268c4e23420c3acade68fac427fffcb8d19d7df95ed7ad17cdef8404f4"
             ],
-            "index": "pypi",
             "markers": "python_version >= '3.7' and python_full_version not in '3.9.0, 3.9.1'",
             "version": "==44.0.0"
         },
@@ -302,12 +301,12 @@
         },
         "django": {
             "hashes": [
-                "sha256:19bbca786df50b9eca23cee79d495facf55c8f5c54c529d9bf1fe7b5ea086af3",
-                "sha256:c46eb936111fffe6ec4bc9930035524a8be98ec2f74d8a0ff351226a3e52f459"
+                "sha256:1e39eafdd1b185e761d9fab7a9f0b9fa00af1b37b25ad980a8aa0dac13535690",
+                "sha256:8d203400bc2952fbfb287c2bbda630297d654920c72a73cc82a9ad7926feaad5"
             ],
             "index": "pypi",
             "markers": "python_version >= '3.10'",
-            "version": "==5.1.5"
+            "version": "==5.1.6"
         },
         "django-cors-headers": {
             "hashes": [
@@ -350,7 +349,6 @@
                 "sha256:2cea9b88407fdac7bbeca0833b189e4c9c53f2ef1e1eaa29f6224dbc809b707a",
                 "sha256:60eaad1199659900dd0af521ed462b793bbdf867432b3948e87416ae4caf6bf8"
             ],
-            "index": "pypi",
             "markers": "python_version >= '2.6' and python_version not in '3.0, 3.1, 3.2, 3.3, 3.4'",
             "version": "==0.19.0"
         },
@@ -400,7 +398,6 @@
                 "sha256:75e98c5f16b0f35b567856f597f06ff2270a374470a5c2392242528e3e3e42fc",
                 "sha256:d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad"
             ],
-            "index": "pypi",
             "markers": "python_version >= '3.8'",
             "version": "==0.28.1"
         },
@@ -518,11 +515,15 @@
             "markers": "python_version >= '3.9'",
             "version": "==2024.10.1"
         },
-        "nilql": {
+        "nillion-sv-wrappers-py": {
             "editable": true,
-            "git": "https://github.com/NillionNetwork/nilql-py.git",
+            "git": "https://github.com/onchain-angels/nillion-sv-wrappers-py.git",
+            "ref": "439a5402d07bdb646fd0a00515255f7a5f38d80f"
+        },
+        "nilql": {
+            "git": "git+https://github.com/NillionNetwork/nilql-py.git#egg=nilql",
             "markers": "python_version >= '3.10'",
-            "ref": "9f49321eefebbc7675484da1e0dcb3fcdd1cdc2d"
+            "ref": "4c636d161c4ec9e295302d4ae0412395da44d1bb"
         },
         "openai": {
             "hashes": [
@@ -685,7 +686,6 @@
                 "sha256:3cc5772eb20009233caf06e9d8a0577824723b44e6648ee0a2aedb6cf9381953",
                 "sha256:dcdd193e30abefd5debf142f9adfcdd2b58004e644f25406ffaebd50bd98dacb"
             ],
-            "index": "pypi",
             "markers": "python_version >= '3.9'",
             "version": "==2.10.1"
         },

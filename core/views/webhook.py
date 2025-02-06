@@ -6,9 +6,10 @@ import json
 from decouple import config
 from asgiref.sync import sync_to_async
 from datetime import datetime
+from nillion_sv_wrappers import SecretVaultWrapper
 
 from core.models import Wallet, WalletToken
-from core.services.nillion import SecretVaultWrapper, config as nillion_config
+from core.nillion_config import config as nillion_config
 
 
 def calculate_portfolio_distribution(wallet_tokens):
