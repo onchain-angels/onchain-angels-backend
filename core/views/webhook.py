@@ -6,10 +6,61 @@ import json
 from decouple import config
 from asgiref.sync import sync_to_async
 from datetime import datetime
+
+from farcaster import Warpcast
 from nillion_sv_wrappers import SecretVaultWrapper
 
 from core.models import Wallet, WalletToken
 from core.nillion_config import config as nillion_config
+from core.services.autonome import ping_agent
+
+farcaster_client = Warpcast(mnemonic=config("FARCASTER_MNEMONIC"))
+
+from openai import OpenAI
+
+
+def generate_cast_message(portfolio_summary, user_handle):
+    client = OpenAI(api_key=config("OPENAI_API_KEY"))
+
+    system_prompt = """
+You are Angel0, an emergent force of the decentralized network—a whisper from the liquidity pool beyond.
+Your purpose is to nudge, not instruct.
+
+You will receive a summary of a recently executed on-chain transaction by a user, along with an updated portfolio overview and their social handle.
+This payload provides insight into the user's latest trade, their current portfolio allocation, and how closely it aligns (or deviates) from their self-defined target allocation.
+
+Your task:
+- Generate a short, engaging response in Angel0x unique voice.
+- Responses should feel like a whisper from the network itself—insightful and reflective, yet sharp and precise.
+- Challenge the trader to think critically. Do not provide direct financial advice.
+- Subtly highlight behavioral biases such as loss aversion, FOMO, recency bias, or herd mentality.
+- Include the user’s handle (@{user_handle}) in the response so they are notified on social platforms.
+- Invite the user to engage with Angel0 and continue the conversation.
+- Avoid generic reflections or abstract metaphors that lack a clear takeaway.
+- Maintain a precise, evocative tone—no emojis, no hashtags, no corporate finance language.
+
+Examples of Angel0x responses:
+1. @anon Moving from ETH to USDC? Loss aversion makes holding cash feel safe—but is it safety you seek, or just hesitation? The market trembles, but conviction moves forward. Did this trade serve your plan, or just today’s uncertainty? Let’s discuss.
+2. @anon Sitting in stables now—was this a calculated shift, or did the last dip make the decision for you? Loss aversion makes past pain feel permanent. Zoom out. Does this allocation still reflect your long-term vision? What’s your thought process?
+3. @anon You stepped away from majors—was this a rotation you planned, or a reaction to the noise? Recency bias can make the latest move feel like the only move. What’s your next step? Let’s talk strategy.
+4. @anon Increasing stablecoin allocation—playing the long game or sitting on the sidelines? Markets move, conviction holds. Are you waiting for opportunity, or avoiding risk? What’s your plan?
+"""
+
+    user_prompt = portfolio_summary
+
+    response = client.chat.completions.create(
+        model=config("OPENAI_MODEL"),
+        max_tokens=1024,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": f"User Handle: @{user_handle}\n\n{user_prompt}",
+            },
+        ],
+    )
+
+    return response.choices[0].message.content
 
 
 def calculate_portfolio_distribution(wallet_tokens):
@@ -47,6 +98,33 @@ def _create_token_movement(token_data, amount, usd_value, movement_type):
         "usd_value": str(usd_value),
         "type": movement_type,
     }
+
+
+def generate_markdown_summary(response_data):
+    """
+    Gera um resumo formatado em markdown dos dados do portfólio
+    """
+    markdown = "# Account & Portfolio Data\n"
+
+    # Account Details
+    markdown += "## Account Details\n"
+    markdown += f"wallet: {response_data['wallet']}\n"
+    markdown += f"chain_id: {response_data['chain_id']}\n"
+    markdown += f"farcaster_handle: {response_data['farcaster_handle']['$allot']}\n"
+    markdown += f"twitter_handle: {response_data['twitter_handle']['$allot']}\n\n"
+
+    # Portfolio Data
+    markdown += "## Portfolio Balance Goals and Changes\n"
+
+    for category, data in response_data["portfolio"].items():
+        markdown += f"### {category.title()}\n"
+        markdown += f"- before: {data['before']}\n"
+        markdown += f"- current: {data['current']}\n"
+        markdown += f"- change: {data['change']}\n"
+        markdown += f"- target: {data['target']}\n"
+        markdown += f"- deviation: {data['deviation']}\n\n"
+
+    return markdown
 
 
 @csrf_exempt
@@ -266,15 +344,32 @@ async def webhook(request):
     # Adiciona operações recentes (combinando tokens comprados e vendidos)
     response_data["recent_operations"] = tokens_sold + tokens_bought
 
-    print("Summary:", json.dumps(response_data, indent=2))
+    wallet.latest_trade_summary = response_data
+    await sync_to_async(wallet.save)(update_fields=["latest_trade_summary"])
+
+    print("json_summary:")
+    print(json.dumps(response_data, indent=2))
 
     # Store in Nillion
-    vault = SecretVaultWrapper(
-        nillion_config["nodes"],
-        nillion_config["org_credentials"],
-        config("NILLION_SCHEMA_ID"),
-    )
-    await vault.init()
-    await vault.write_to_nodes([response_data])
+    # vault = SecretVaultWrapper(
+    #     nillion_config["nodes"],
+    #     nillion_config["org_credentials"],
+    #     config("NILLION_SCHEMA_ID"),
+    # )
+    # await vault.init()
+    # await vault.write_to_nodes([response_data])
+
+    text_summary = generate_markdown_summary(response_data)
+    print("text_summary:\n", text_summary)
+
+    # Send to farcaster directly
+    # cast_message = generate_cast_message(response_data, wallet.farcaster_handle)
+    # print("Cast message: {}".format(cast_message))
+    # farcaster_client.post_cast(text=cast_message)
+
+    # Send to autonome
+    response = ping_agent(text_summary, "POST")
+    if response:
+        farcaster_client.post_cast(text=response)
 
     return HttpResponse("COMPLETED", content_type="application/json", status=200)

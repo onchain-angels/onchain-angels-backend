@@ -151,6 +151,11 @@ class Wallet(models.Model):
         default=dict(majors=25, stables=25, alts=25, memes=25),
         validators=[validate_portfolio_sum],
     )
+    latest_trade_summary = JSONField(
+        null=True,
+        blank=True,
+        help_text="Armazena o resumo do trade mais recente desta carteira",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

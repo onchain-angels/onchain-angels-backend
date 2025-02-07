@@ -17,6 +17,7 @@ django-cors-headers = "*"
 requests = "*"
 openai = "*"
 nillion-sv-wrappers-py = {editable = true, ref = "main", git = "https://github.com/onchain-angels/nillion-sv-wrappers-py.git"}
+farcaster = "*"
 
 [dev-packages]
 black = "*"

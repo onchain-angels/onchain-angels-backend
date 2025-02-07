@@ -3,13 +3,14 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext as _
+from django.db.models import Q
 
 from core.models import Wallet
 
 
 class WalletSerializer(serializers.ModelSerializer):
     address = serializers.CharField(max_length=50, required=True)
-    portfolio = serializers.JSONField(required=False)
+    target_portfolio = serializers.JSONField(source="portfolio", required=False)
     farcaster_handle = serializers.CharField(
         max_length=50, required=False, allow_null=True
     )
@@ -17,6 +18,7 @@ class WalletSerializer(serializers.ModelSerializer):
         max_length=50, required=False, allow_null=True
     )
     chain_id = serializers.IntegerField(required=False)
+    latest_trade_summary = serializers.JSONField(required=False)
 
     class Meta:
         model = Wallet
@@ -25,8 +27,9 @@ class WalletSerializer(serializers.ModelSerializer):
             "address",
             "farcaster_handle",
             "twitter_handle",
-            "portfolio",
+            "target_portfolio",
             "chain_id",
+            "latest_trade_summary",
         ]
 
     def validate(self, data):
@@ -84,5 +87,22 @@ class WalletViewSet(
     @action(detail=False, methods=["get"], url_path="address/(?P<address>[^/.]+)")
     def get_by_address(self, request, address=None):
         wallet = get_object_or_404(Wallet, address=address)
+        serializer = self.get_serializer(wallet)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], url_path="handle/(?P<handle>[^/.]+)")
+    def get_by_handle(self, request, handle=None):
+        """
+        Busca carteira por Farcaster handle ou Twitter handle
+        """
+        wallet = Wallet.objects.filter(
+            Q(farcaster_handle=handle) | Q(twitter_handle=handle)
+        ).first()
+
+        if not wallet:
+            return Response(
+                {"detail": _("Wallet não encontrada para este handle")}, status=404
+            )
+
         serializer = self.get_serializer(wallet)
         return Response(serializer.data)
