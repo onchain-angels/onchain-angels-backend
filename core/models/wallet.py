@@ -145,8 +145,10 @@ def validate_portfolio_sum(value):
 class Wallet(models.Model):
     address = models.CharField(max_length=50, unique=True)
     chain_id = models.IntegerField(default=8453)  # etherscan chain id for Base
-    farcaster_handle = models.CharField(max_length=50, null=True, blank=True)
-    twitter_handle = models.CharField(max_length=50, null=True, blank=True)
+    farcaster_handle = models.CharField(
+        max_length=50, unique=True, null=True, blank=True
+    )
+    twitter_handle = models.CharField(max_length=50, unique=True, null=True, blank=True)
     portfolio = JSONField(
         default=dict(majors=25, stables=25, alts=25, memes=25),
         validators=[validate_portfolio_sum],

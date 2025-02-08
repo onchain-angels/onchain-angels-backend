@@ -4,18 +4,29 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext as _
 from django.db.models import Q
+from rest_framework.validators import UniqueValidator
 
 from core.models import Wallet
 
 
 class WalletSerializer(serializers.ModelSerializer):
-    address = serializers.CharField(max_length=50, required=True)
+    address = serializers.CharField(
+        max_length=50,
+        required=True,
+        validators=[UniqueValidator(queryset=Wallet.objects.all())],
+    )
     target_portfolio = serializers.JSONField(source="portfolio", required=False)
     farcaster_handle = serializers.CharField(
-        max_length=50, required=False, allow_null=True
+        max_length=50,
+        required=False,
+        allow_null=True,
+        validators=[UniqueValidator(queryset=Wallet.objects.all())],
     )
     twitter_handle = serializers.CharField(
-        max_length=50, required=False, allow_null=True
+        max_length=50,
+        required=False,
+        allow_null=True,
+        validators=[UniqueValidator(queryset=Wallet.objects.all())],
     )
     chain_id = serializers.IntegerField(required=False)
     latest_trade_summary = serializers.JSONField(required=False)
