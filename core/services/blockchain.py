@@ -90,7 +90,7 @@ def parse_coingecko_token_info(token_info, network=None):
 
     try:
         token_category = extract_token_category(token_description)
-        print("token_category: {}".format(token_category))
+        # print("token_category: {}".format(token_category))
     except Exception as e:
         print("Error extracting token category: {}".format(e))
         token_category = None
@@ -180,8 +180,7 @@ def get_eth_balance_etherscan(chain_id, address):
     )
     response = requests.get(url)
     eth_balance = int(response.json().get("result"))
-    # eth_balance_float = float(eth_balance) / 10**18
-    print("eth_balance: {} ".format(eth_balance))
+    # print("eth_balance: {} ".format(eth_balance))
     return eth_balance
 
 
@@ -203,7 +202,7 @@ def get_token_balance_alchemy(network, address):
     headers = {"accept": "application/json", "content-type": "application/json"}
     token_balances_response = requests.post(url, json=payload, headers=headers)
     tokens = token_balances_response.json().get("result").get("tokenBalances")
-    print("tokens: {}".format(tokens))
+    # print("tokens: {}".format(tokens))
     return tokens
 
 
@@ -226,7 +225,7 @@ def get_token_metadata_alchemy(network, token_contract_address):
     headers = {"accept": "application/json", "content-type": "application/json"}
     response_token_metadata = requests.post(url, json=payload, headers=headers)
     token_metadata = response_token_metadata.json()
-    print("token_metadata: {}".format(token_metadata))
+    # print("token_metadata: {}".format(token_metadata))
     return token_metadata
 
 
@@ -248,10 +247,9 @@ def get_token_price_alchemy(network, token_contract_address):
 
         token_price = response_token_price.json()
         if token_price.get("error") is not None:
-            print("token_price: {}".format(token_price))
             return {"data": []}
 
-        print("token_price: {}".format(token_price))
+        # print("token_price: {}".format(token_price))
         return token_price
 
     except Exception as e:

@@ -36,11 +36,11 @@ def _add_token_to_wallet(
     )
 
     token_price_usd = token_info.get("token_price_usd")
-    print("token_price: {}".format(token_price_usd))
+    # print("token_price: {}".format(token_price_usd))
     token_balance = token_balance_decimal / 10**token_obj.decimals
-    print("token_balance: {}".format(token_balance))
+    # print("token_balance: {}".format(token_balance))
     token_balance_usd = token_price_usd * token_balance
-    print("token_amount_usd: {}".format(token_balance_usd))
+    # print("token_amount_usd: {}".format(token_balance_usd))
 
     WalletToken.objects.update_or_create(
         wallet=wallet,

@@ -371,13 +371,13 @@ async def webhook(request):
     print(json.dumps(response_data, indent=2))
 
     # Store in Nillion
-    # vault = SecretVaultWrapper(
-    #     nillion_config["nodes"],
-    #     nillion_config["org_credentials"],
-    #     config("NILLION_SCHEMA_ID"),
-    # )
-    # await vault.init()
-    # await vault.write_to_nodes([response_data])
+    vault = SecretVaultWrapper(
+        nillion_config["nodes"],
+        nillion_config["org_credentials"],
+        config("NILLION_SCHEMA_ID"),
+    )
+    await vault.init()
+    await vault.write_to_nodes([response_data])
 
     text_summary = _generate_markdown_summary(response_data)
     print("text_summary:\n", text_summary)
