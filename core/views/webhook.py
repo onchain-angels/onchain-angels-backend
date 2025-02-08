@@ -393,6 +393,10 @@ async def webhook(request):
     # Check if user handle is present without @ and add it if necessary
     if user_handle and user_handle in response and f"@{user_handle}" not in response:
         response = response.replace(user_handle, f"@{user_handle}")
+    
+    # If user handle is not present at all, add it at the beginning
+    if user_handle and user_handle not in response:
+        response = f"@{user_handle} {response}"
 
     print("Message: {}".format(response))
 
