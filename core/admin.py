@@ -1,5 +1,6 @@
 from django.contrib import admin
 from core.models import Wallet, Token, WalletToken
+from core.models.alchemy_event import AlchemyEvent
 
 
 class WalletTokenInline(admin.TabularInline):
@@ -28,3 +29,11 @@ class TokenAdmin(admin.ModelAdmin):
     list_filter = ("chain_id", "category")
     search_fields = ("symbol", "name", "address")
     readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(AlchemyEvent)
+class AlchemyEventAdmin(admin.ModelAdmin):
+    list_display = ('event_id', 'processed', 'created_at')
+    search_fields = ('event_id',)
+    readonly_fields = ('created_at',)
+    ordering = ('-created_at',)

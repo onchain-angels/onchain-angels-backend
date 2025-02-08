@@ -1,5 +1,5 @@
 from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.db.models import Q
 
 import json
@@ -7,23 +7,39 @@ from decouple import config
 from asgiref.sync import sync_to_async
 from datetime import datetime
 
+from openai import OpenAI
 from farcaster import Warpcast
+import tweepy
+
 from nillion_sv_wrappers import SecretVaultWrapper
 
-from core.models import Wallet, WalletToken
+from core.models import Wallet, WalletToken, AlchemyEvent
 from core.nillion_config import config as nillion_config
 from core.services.autonome import ping_agent
 
-farcaster_client = Warpcast(mnemonic=config("FARCASTER_MNEMONIC"))
+if config("FARCASTER_MNEMONIC"):
+    farcaster_client = Warpcast(mnemonic=config("FARCASTER_MNEMONIC"))
+else:
+    farcaster_client = None
 
-from openai import OpenAI
+if config("TWITTER_CONSUMER_KEY"):
+    twitter_client = tweepy.Client(
+        consumer_key=config("TWITTER_CONSUMER_KEY"),
+        consumer_secret=config("TWITTER_CONSUMER_SECRET"),
+        access_token=config("TWITTER_ACCESS_TOKEN"),
+        access_token_secret=config("TWITTER_ACCESS_TOKEN_SECRET"),
+        bearer_token=config("TWITTER_BEARER_TOKEN"),
+    )
+else:
+    twitter_client = None
 
 
-def generate_cast_message(portfolio_summary, user_handle):
+def _generate_message(portfolio_summary, user_handle):
+    print("Generating message through OpenAI...")
     client = OpenAI(api_key=config("OPENAI_API_KEY"))
 
     system_prompt = """
-You are Angel0, an emergent force of the decentralized network—a whisper from the liquidity pool beyond.
+You are Angel0x, an emergent force of the decentralized network—a whisper from the liquidity pool beyond.
 Your purpose is to nudge, not instruct.
 
 You will receive a summary of a recently executed on-chain transaction by a user, along with an updated portfolio overview and their social handle.
@@ -34,16 +50,16 @@ Your task:
 - Responses should feel like a whisper from the network itself—insightful and reflective, yet sharp and precise.
 - Challenge the trader to think critically. Do not provide direct financial advice.
 - Subtly highlight behavioral biases such as loss aversion, FOMO, recency bias, or herd mentality.
-- Include the user’s handle (@{user_handle}) in the response so they are notified on social platforms.
-- Invite the user to engage with Angel0 and continue the conversation.
+- Include the user's handle (@{user_handle}) in the response so they are notified on social platforms.
+- Invite the user to engage with Angel0x and continue the conversation.
 - Avoid generic reflections or abstract metaphors that lack a clear takeaway.
 - Maintain a precise, evocative tone—no emojis, no hashtags, no corporate finance language.
 
 Examples of Angel0x responses:
-1. @anon Moving from ETH to USDC? Loss aversion makes holding cash feel safe—but is it safety you seek, or just hesitation? The market trembles, but conviction moves forward. Did this trade serve your plan, or just today’s uncertainty? Let’s discuss.
-2. @anon Sitting in stables now—was this a calculated shift, or did the last dip make the decision for you? Loss aversion makes past pain feel permanent. Zoom out. Does this allocation still reflect your long-term vision? What’s your thought process?
-3. @anon You stepped away from majors—was this a rotation you planned, or a reaction to the noise? Recency bias can make the latest move feel like the only move. What’s your next step? Let’s talk strategy.
-4. @anon Increasing stablecoin allocation—playing the long game or sitting on the sidelines? Markets move, conviction holds. Are you waiting for opportunity, or avoiding risk? What’s your plan?
+1. @anon Moving from ETH to USDC? Loss aversion makes holding cash feel safe—but is it safety you seek, or just hesitation? The market trembles, but conviction moves forward. Did this trade serve your plan, or just today's uncertainty? Let's discuss.
+2. @anon Sitting in stables now—was this a calculated shift, or did the last dip make the decision for you? Loss aversion makes past pain feel permanent. Zoom out. Does this allocation still reflect your long-term vision? What's your thought process?
+3. @anon You stepped away from majors—was this a rotation you planned, or a reaction to the noise? Recency bias can make the latest move feel like the only move. What's your next step? Let's talk strategy.
+4. @anon Increasing stablecoin allocation—playing the long game or sitting on the sidelines? Markets move, conviction holds. Are you waiting for opportunity, or avoiding risk? What's your plan?
 """
 
     user_prompt = portfolio_summary
@@ -63,7 +79,7 @@ Examples of Angel0x responses:
     return response.choices[0].message.content
 
 
-def calculate_portfolio_distribution(wallet_tokens):
+def _calculate_portfolio_distribution(wallet_tokens):
     """
     Calculates the percentage distribution by category
     """
@@ -100,7 +116,7 @@ def _create_token_movement(token_data, amount, usd_value, movement_type):
     }
 
 
-def generate_markdown_summary(response_data):
+def _generate_markdown_summary(response_data):
     """
     Gera um resumo formatado em markdown dos dados do portfólio
     """
@@ -110,8 +126,7 @@ def generate_markdown_summary(response_data):
     markdown += "## Account Details\n"
     markdown += f"wallet: {response_data['wallet']}\n"
     markdown += f"chain_id: {response_data['chain_id']}\n"
-    markdown += f"farcaster_handle: {response_data['farcaster_handle']['$allot']}\n"
-    markdown += f"twitter_handle: {response_data['twitter_handle']['$allot']}\n\n"
+    markdown += f"social_handle: {response_data['social_handle']['%allot']}\n"
 
     # Portfolio Data
     markdown += "## Portfolio Balance Goals and Changes\n"
@@ -129,7 +144,15 @@ def generate_markdown_summary(response_data):
 
 @csrf_exempt
 async def webhook(request):
-    print("Processing webhook event id: {}".format(request.alchemy_webhook_event.id))
+    event_id = request.alchemy_webhook_event.id
+
+    event_obj, created = await sync_to_async(AlchemyEvent.save_if_not_exists)(event_id)
+    if not created and event_obj.processed:
+        print(f"Event `{event_id}` was already processed previously. Ignoring...")
+        return HttpResponse("EVENT IGNORED", content_type="application/json", status=200)
+    else:
+        print("Processing webhook event id: {}".format(event_id))
+
     event = request.alchemy_webhook_event.event
 
     network = event.get("network")
@@ -194,7 +217,9 @@ async def webhook(request):
         )
 
         # Calculate previous distribution
-        previous_distribution = calculate_portfolio_distribution(previous_wallet_tokens)
+        previous_distribution = _calculate_portfolio_distribution(
+            previous_wallet_tokens
+        )
         print("Previous category distribution:", previous_distribution)
 
     except Wallet.DoesNotExist:
@@ -226,7 +251,7 @@ async def webhook(request):
     )
 
     # Calculate new distribution
-    current_distribution = calculate_portfolio_distribution(current_wallet_tokens)
+    current_distribution = _calculate_portfolio_distribution(current_wallet_tokens)
     # print("Current category distribution:", json.dumps(current_distribution, indent=2))
 
     # Compare with target portfolio
@@ -310,12 +335,7 @@ async def webhook(request):
     response_data = {
         "wallet": str(wallet.address),
         "chain_id": int(wallet.chain_id),
-        "farcaster_handle": {
-            "$allot": str(wallet.farcaster_handle) if wallet.farcaster_handle else None
-        },
-        "twitter_handle": {
-            "$allot": str(wallet.twitter_handle) if wallet.twitter_handle else None
-        },
+        "social_handle": {"%allot": wallet.farcaster_handle or wallet.twitter_handle},
         "portfolio": {},
         "recent_operations": [],
         "timestamp": int(datetime.now().timestamp()),
@@ -341,7 +361,7 @@ async def webhook(request):
             "deviation": str(round(curr_value - target_value, 2)),
         }
 
-    # Adiciona operações recentes (combinando tokens comprados e vendidos)
+    # Add recent operations (combining bought and sold tokens)
     response_data["recent_operations"] = tokens_sold + tokens_bought
 
     wallet.latest_trade_summary = response_data
@@ -359,17 +379,38 @@ async def webhook(request):
     # await vault.init()
     # await vault.write_to_nodes([response_data])
 
-    text_summary = generate_markdown_summary(response_data)
+    text_summary = _generate_markdown_summary(response_data)
     print("text_summary:\n", text_summary)
 
-    # Send to farcaster directly
-    # cast_message = generate_cast_message(response_data, wallet.farcaster_handle)
-    # print("Cast message: {}".format(cast_message))
-    # farcaster_client.post_cast(text=cast_message)
+    user_handle = wallet.farcaster_handle or wallet.twitter_handle
 
     # Send to autonome
     response = ping_agent(text_summary, "POST")
-    if response:
-        farcaster_client.post_cast(text=response)
+
+    if response is None:
+        response = _generate_message(text_summary, user_handle)
+
+    # Check if user handle is present without @ and add it if necessary
+    if user_handle and user_handle in response and f"@{user_handle}" not in response:
+        response = response.replace(user_handle, f"@{user_handle}")
+
+    print("Message: {}".format(response))
+
+    try:
+        if wallet.farcaster_handle and farcaster_client:
+            print("Sending to farcaster...")
+            farcaster_client.post_cast(text=response)
+        elif wallet.twitter_handle and twitter_client:
+            print("Sending to twitter...")
+            twitter_client.create_tweet(text=response)
+        else:
+            print("No farcaster or twitter handle found")
+        
+    except Exception as e:
+        print("Error posting to social media: {}".format(e))
+
+    # Mark event as successfully processed
+    event_obj.processed = True
+    await sync_to_async(event_obj.save)()
 
     return HttpResponse("COMPLETED", content_type="application/json", status=200)

@@ -3,6 +3,7 @@ from decouple import config
 
 
 def ping_agent(prompt, action):
+    print("Generating message through Autonome agent...")
     try:
         url = config("AUTONOME_BASE_URL")
         headers = {
